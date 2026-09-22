@@ -186,7 +186,7 @@ battery-dt-poc/
 │   ├── soc-service/          # CNN-LSTM SoC inference
 │   ├── soh-service/          # GPR SoH inference
 │   ├── feature-engineering/  # InfluxDB abstraction
-│   ├── data-ingestion/       # MQTT → InfluxDB pipeline
+│   └── data-ingestion/       # MQTT → InfluxDB pipeline
 ├── scripts/
 │   ├── generate_training_data.py
 │   ├── train_soc_model.py
@@ -194,17 +194,17 @@ battery-dt-poc/
 │   ├── simulate_fleet.py
 │   ├── benchmark.py
 │   ├── validate_soh_forklift.py
-│   └── create_grafana_dashboard.py
-|   └── upload_to_minio.py
+│   ├── create_grafana_dashboard.py
+|   ├── upload_to_minio.py
 |   └── inject_historical_telemetry.py
 ├── data/
 │   ├── models/               # Trained model weights
 │   └── validation/           # Validation outputs
 └── config/
     ├── influxdb/
-    └── grafana/
-    └── prometheus/
-    └── nginx/
+    ├── grafana/
+    ├── prometheus/
+    ├── nginx/
     └── mosquitto/
 ```
 
