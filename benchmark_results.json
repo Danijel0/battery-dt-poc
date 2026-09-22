@@ -1,0 +1,98 @@
+{
+  "timestamp": "2026-05-15T15:10:32.009814+00:00",
+  "config": {
+    "n_vehicles": 20,
+    "duration_s": 60,
+    "workers": 4
+  },
+  "latency": {
+    "SoC": {
+      "cold_mean_ms": 124.03,
+      "cold_p95_ms": 546.93,
+      "cold_n": 10,
+      "mean_ms": 10.2,
+      "p50_ms": 8.93,
+      "p95_ms": 21.14,
+      "p99_ms": 28.02,
+      "cache_speedup_x": 12.16,
+      "target_ms": 1000,
+      "pass": true,
+      "n_samples": 50
+    },
+    "SoH": {
+      "cold_mean_ms": 8908.88,
+      "cold_p95_ms": 10397.54,
+      "cold_n": 10,
+      "mean_ms": 15.33,
+      "p50_ms": 15.23,
+      "p95_ms": 25.86,
+      "p99_ms": 32.82,
+      "cache_speedup_x": 580.96,
+      "target_ms": 5000,
+      "pass": true,
+      "n_samples": 50
+    }
+  },
+  "throughput": {
+    "requests_total": 10649,
+    "requests_ok": 10649,
+    "errors": 0,
+    "error_rate_pct": 0.0,
+    "rps": 177.48,
+    "workers": 4,
+    "duration_s": 60,
+    "p95_ms_under_load": 41.24
+  },
+  "cache": {
+    "hit_rate_pct": 100.0,
+    "mean_hit_latency_ms": 9.28,
+    "mean_miss_latency_ms": null,
+    "cache_speedup_x": null,
+    "cold_mean_ms": 6557.66,
+    "n_vehicles": 10
+  },
+  "resources": {
+    "dt-soh": {
+      "idle_baseline_cpu": "0.32%",
+      "idle_baseline_mem": "114MiB / 3.77GiB",
+      "under_load_cpu": "0.19%",
+      "under_load_mem": "114MiB / 3.77GiB"
+    },
+    "dt-mosquitto": {
+      "idle_baseline_cpu": "0.72%",
+      "idle_baseline_mem": "21.83MiB / 3.77GiB",
+      "under_load_cpu": "0.24%",
+      "under_load_mem": "21.81MiB / 3.77GiB"
+    },
+    "dt-ingestion": {
+      "idle_baseline_cpu": "29.99%",
+      "idle_baseline_mem": "38.87MiB / 3.77GiB",
+      "under_load_cpu": "19.31%",
+      "under_load_mem": "38.87MiB / 3.77GiB"
+    },
+    "dt-soc": {
+      "idle_baseline_cpu": "0.24%",
+      "idle_baseline_mem": "274.7MiB / 3.77GiB",
+      "under_load_cpu": "47.36%",
+      "under_load_mem": "274.7MiB / 3.77GiB"
+    },
+    "dt-feature-eng": {
+      "idle_baseline_cpu": "0.63%",
+      "idle_baseline_mem": "275.5MiB / 3.77GiB",
+      "under_load_cpu": "0.26%",
+      "under_load_mem": "268.1MiB / 3.77GiB"
+    },
+    "dt-influxdb": {
+      "idle_baseline_cpu": "6.54%",
+      "idle_baseline_mem": "126.3MiB / 3.77GiB",
+      "under_load_cpu": "12.87%",
+      "under_load_mem": "116.7MiB / 3.77GiB"
+    },
+    "dt-redis": {
+      "idle_baseline_cpu": "2.60%",
+      "idle_baseline_mem": "11.14MiB / 3.77GiB",
+      "under_load_cpu": "4.05%",
+      "under_load_mem": "10.39MiB / 3.77GiB"
+    }
+  }
+}

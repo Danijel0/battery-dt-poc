@@ -1,0 +1,4 @@
+paho-mqtt==2.1.0
+jsonschema==4.22.0
+influxdb-client==1.43.0
+prometheus-client==0.20.0

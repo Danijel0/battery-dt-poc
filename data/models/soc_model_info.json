@@ -1,0 +1,7 @@
+{
+  "model_class": "CNNLSTMSoC",
+  "window_size": 60,
+  "n_features": 4,
+  "best_val_rmse": 0.02383468672633171,
+  "model_path": "data/models\\cnn_lstm_soc_best.pt"
+}

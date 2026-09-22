@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "data-ingestion"
+    static_configs:
+      - targets: ["data-ingestion:8001"]
+
+  - job_name: "feature-engineering"
+    static_configs:
+      - targets: ["feature-engineering:8000"]
+    metrics_path: /metrics
+
+  - job_name: "soc-service"
+    static_configs:
+      - targets: ["soc-service:8000"]
+    metrics_path: /metrics
+
+  - job_name: "soh-service"
+    static_configs:
+      - targets: ["soh-service:8000"]
+    metrics_path: /metrics
+
+  - job_name: "influxdb"
+    static_configs:
+      - targets: ["influxdb:8086"]
+    metrics_path: /metrics

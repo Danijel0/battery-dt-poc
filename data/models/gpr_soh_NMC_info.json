@@ -1,0 +1,26 @@
+{
+  "chemistry": "NMC",
+  "model_class": "GaussianProcessRegressor",
+  "kernel": "28.9**2 * Matern(length_scale=24.5, nu=2.5) + WhiteKernel(noise_level=1e-06)",
+  "features": [
+    "c_rate",
+    "temp_mean_c",
+    "temp_min_c",
+    "temp_max_c",
+    "current_mean_a",
+    "soc_target",
+    "nominal_cap_ah"
+  ],
+  "target": "median_resistance_ohm",
+  "aggregation": "per_scenario",
+  "n_scenarios": 135,
+  "loo_rmse_ohm": 3.567877149944925e-05,
+  "loo_rmse_pct": 0.08664945366415404,
+  "loo_mae_ohm": 2.479213183873841e-05,
+  "y_range_ohm": 0.04117599129676819,
+  "r_nominal_ohm": 0.04366,
+  "r_eol_ohm": 0.08732,
+  "soh_eol_pct": 80.0,
+  "model_path": "data/models\\gpr_soh_NMC.pkl",
+  "scaler_path": "data/models\\gpr_soh_NMC_scaler.pkl"
+}

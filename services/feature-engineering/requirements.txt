@@ -1,0 +1,6 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+influxdb-client[async]==1.43.0
+numpy==1.26.4
+pandas==2.2.2
+prometheus-client==0.20.0

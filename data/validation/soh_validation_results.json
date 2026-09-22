@@ -1,0 +1,12 @@
+{
+  "r_nominal_mohm": 1.0189,
+  "r_eol_mohm": 2.0378,
+  "n_cells": 3,
+  "n_rounds": 57,
+  "r_rel_final": 1.0017,
+  "soh_final_pct": 99.97,
+  "eol_reached": true,
+  "gpr_available": true,
+  "gpr_r_rel_mean": NaN,
+  "gpr_r_rel_std": NaN
+}

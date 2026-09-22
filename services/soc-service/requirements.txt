@@ -1,0 +1,9 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+torch==2.3.0
+numpy==1.26.4
+redis==5.0.4
+httpx==0.27.0
+pydantic==2.7.1
+influxdb-client==1.43.0
+prometheus-client==0.20.0

@@ -1,0 +1,341 @@
+version: "3.9"
+
+# Battery Digital Twin PoC — Docker Compose
+# Aligned with Architecture_draft.pdf (Danijel Miokovic, 2024/2025)
+#
+# Layers:
+#
+#   INGESTION LAYER  : mosquitto (MQTT broker), data-ingestion (validator)
+#   DATA LAYER       : influxdb (time-series), redis (prediction cache), minio (object storage)
+#   ML INFRA LAYER   : mlflow (model registry), feature-engineering
+#   SERVICE LAYER    : soc-service, soh-service
+#   APPLICATION LAYER: api-gateway (REST)
+#   OBSERVABILITY    : prometheus, grafana
+
+networks:
+  dt-network:
+    driver: bridge
+
+volumes:
+  influxdb-data:
+  mosquitto-data:
+  mosquitto-log:
+  redis-data:
+  minio-data:
+  mlflow-data:
+  prometheus-data:
+  grafana-data:
+
+services:
+
+  # ─────────────────────────────────────────────
+  # INGESTION LAYER — Eclipse Mosquitto (MQTT Broker)
+  # Receives BMS telemetry from vehicles over MQTT
+  # Topics: dt/telemetry/{vehicle_id}
+  # QoS level 1, per Section 2.2 (ISO 23247 Device Communication Network)
+  # ─────────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: dt-mosquitto
+    ports:
+      - "1883:1883"    # MQTT
+      - "9883:9001"    # WebSocket
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    networks:
+      - dt-network
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "health", "-m", "ping", "-q", "0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # INGESTION LAYER — Data Ingestion / Validator
+  # Subscribes to MQTT dt/telemetry/#, validates
+  # (schema + range + outlier), writes to InfluxDB
+  # Per Section 3.2.1: JSON Schema validation,
+  # real-time with negligible latency (<< 1s total pipeline)
+  # ─────────────────────────────────────────────
+  data-ingestion:
+    build:
+      context: ./services/data-ingestion
+      dockerfile: Dockerfile
+    container_name: dt-ingestion
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      MQTT_TOPIC: "dt/telemetry/#"
+      MQTT_QOS: 1
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: dt-super-secret-token
+      INFLUX_ORG: battery-dt
+      INFLUX_BUCKET: telemetry
+      LOG_LEVEL: INFO
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    networks:
+      - dt-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # DATA LAYER — InfluxDB 2.x (Time-Series DB)
+  # Schema (Section 3.2.2):
+  #   measurements: voltage, current, temperature
+  #   tags: vehicle_id, battery_pack_id
+  #   retention: 12 months
+  # ─────────────────────────────────────────────
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: dt-influxdb
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: dtadmin
+      DOCKER_INFLUXDB_INIT_PASSWORD: dtpassword
+      DOCKER_INFLUXDB_INIT_ORG: battery-dt
+      DOCKER_INFLUXDB_INIT_BUCKET: telemetry
+      DOCKER_INFLUXDB_INIT_RETENTION: 8760h    # 12 months
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: dt-super-secret-token
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - ./config/influxdb/init-buckets.sh:/docker-entrypoint-initdb.d/init-buckets.sh:ro
+    networks:
+      - dt-network
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # DATA LAYER — Redis (Prediction Cache)
+  # TTLs per Section 3.2.2:
+  #   Last SoC     → TTL 60s   (db=0)
+  #   Last SoH     → TTL 24h   (db=1)
+  #   Route energy → TTL 1h    (db=2)
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: dt-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - dt-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # DATA LAYER — MinIO (Object Storage)
+  # Stores per Section 3.2.2:
+  #   PyBaMM outputs (HDF5)
+  #   Model weights (.pth, .h5)
+  #   Training logs
+  # Retention: indefinite, models versioned via MLflow
+  # ─────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: dt-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: dtminio
+      MINIO_ROOT_PASSWORD: dtminiopass
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # Web console
+    volumes:
+      - minio-data:/data
+    networks:
+      - dt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # ML INFRA LAYER — MLflow (Model Registry)
+  # Stores: model version, accuracy metrics,
+  #         training dataset reference, deployment status
+  # Artifact backend: MinIO (S3-compatible)
+  # ─────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    container_name: dt-mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root s3://mlflow-artifacts/
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: dtminio
+      AWS_SECRET_ACCESS_KEY: dtminiopass
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - dt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # ML INFRA LAYER — Feature Engineering Service
+  # Key design (Section 3.2.3): prediction services do NOT
+  # query InfluxDB directly — all queries routed through here.
+  # Functions: time-series windowing, normalization,
+  #            derived features, feature selection
+  # ─────────────────────────────────────────────
+  feature-engineering:
+    build:
+      context: ./services/feature-engineering
+      dockerfile: Dockerfile
+    container_name: dt-feature-eng
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: dt-super-secret-token
+      INFLUX_ORG: battery-dt
+      INFLUX_BUCKET_TELEMETRY: telemetry
+      LOG_LEVEL: INFO
+    ports:
+      - "8004:8000"
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    networks:
+      - dt-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # SERVICE LAYER — SoC Prediction Service
+  # CNN-LSTM (Song et al., 2019)
+  # ─────────────────────────────────────────────
+  soc-service:
+    build:
+      context: ./services/soc-service
+      dockerfile: Dockerfile
+    container_name: dt-soc
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: dt-super-secret-token
+      INFLUX_ORG: battery-dt
+      INFLUX_BUCKET_SOC: soc-estimates
+      FEATURE_ENG_URL: http://feature-engineering:8000
+      REDIS_URL: redis://redis:6379/0
+      REDIS_TTL_SOC: 60
+      MODEL_PATH: /app/models/cnn_lstm_soc_best.pt
+      NORM_STATS_PATH: /app/models/normalisation_stats.json
+      LOG_LEVEL: INFO
+    volumes:
+      - ./data/models:/app/models:ro
+    ports:
+      - "8001:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      feature-engineering:
+        condition: service_started
+    networks:
+      - dt-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # SERVICE LAYER — SoH Prediction Service
+  # Model: GPR (Kumar & Das, 2024)
+  # ─────────────────────────────────────────────
+  soh-service:
+    build:
+      context: ./services/soh-service
+      dockerfile: Dockerfile
+    container_name: dt-soh
+    environment:
+      FEATURE_ENG_URL: http://feature-engineering:8000
+      REDIS_URL: redis://redis:6379/1
+      REDIS_TTL_SOH: 86400
+      MODELS_DIR: /app/models
+      INFO_PATH: /app/models/gpr_soh_info.json
+      LOG_LEVEL: INFO
+    volumes:
+      - ./data/models:/app/models:ro
+    ports:
+      - "8002:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      feature-engineering:
+        condition: service_started
+    networks:
+      - dt-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # APPLICATION LAYER — API Gateway (Nginx)
+  # REST endpoints per Section 6.1:
+  #   POST /api/v1/soc/predict       → soc-service:8000
+  #   GET  /api/v1/soh/status/{id}   → soh-service:8000
+  #   POST /api/v1/energy/predict    → energy-service:8000
+  # ─────────────────────────────────────────────
+  api-gateway:
+    image: nginx:1.27-alpine
+    container_name: dt-gateway
+    ports:
+      - "8080:80"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - dt-network
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # OBSERVABILITY — Prometheus + Grafana
+  # Metrics: inference latency, cache hit rates,
+  #          queue depth, SoC/SoH trends
+  # ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: dt-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - dt-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    container_name: dt-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: dtgrafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - influxdb
+    networks:
+      - dt-network
+    restart: unless-stopped

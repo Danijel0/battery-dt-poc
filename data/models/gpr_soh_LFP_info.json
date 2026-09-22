@@ -1,0 +1,24 @@
+{
+  "chemistry": "LFP",
+  "model_class": "GaussianProcessRegressor",
+  "kernel": "47.5**2 * Matern(length_scale=24, nu=2.5) + WhiteKernel(noise_level=1e-06)",
+  "features": [
+    "c_rate",
+    "temp_mean_c",
+    "current_mean_a",
+    "soc_target",
+    "nominal_cap_ah"
+  ],
+  "target": "median_resistance_ohm",
+  "aggregation": "per_scenario",
+  "n_scenarios": 138,
+  "loo_rmse_ohm": 7.565074229563439e-05,
+  "loo_rmse_pct": 0.07910273025011384,
+  "loo_mae_ohm": 3.11702490784733e-05,
+  "y_range_ohm": 0.09563606977462769,
+  "r_nominal_ohm": 0.04536,
+  "r_eol_ohm": 0.09072,
+  "soh_eol_pct": 80.0,
+  "model_path": "data/models\\gpr_soh_LFP.pkl",
+  "scaler_path": "data/models\\gpr_soh_LFP_scaler.pkl"
+}

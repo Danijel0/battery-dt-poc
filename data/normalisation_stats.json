@@ -1,0 +1,22 @@
+{
+  "voltage": {
+    "mean": 3.365426778793335,
+    "std": 0.31659358739852905
+  },
+  "current": {
+    "mean": 3.320216417312622,
+    "std": 2.2114431858062744
+  },
+  "temperature": {
+    "mean": 22.961355209350586,
+    "std": 19.568498611450195
+  },
+  "features": [
+    "voltage_V",
+    "current_A",
+    "temperature_C",
+    "chem_id"
+  ],
+  "window_size": 60,
+  "version": "v2-corrected"
+}
